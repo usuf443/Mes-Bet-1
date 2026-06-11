@@ -1,0 +1,56 @@
+{
+  "Юсуф": {
+    "password": "123",
+    "avatar": "https://i.pravatar.cc/100?u=%D0%AE%D1%81%D1%83%D1%84",
+    "nickname": "Юсуф",
+    "birthplace": "",
+    "birthyear": "",
+    "bio": "Demo user",
+    "registeredAt": "2026-06-11T16:41:04.056Z"
+  },
+  "Али": {
+    "password": "123",
+    "avatar": "https://i.pravatar.cc/100?u=%D0%90%D0%BB%D0%B8",
+    "nickname": "Али",
+    "birthplace": "",
+    "birthyear": "",
+    "bio": "Demo user",
+    "registeredAt": "2026-06-11T16:41:04.057Z"
+  },
+  "Марат": {
+    "password": "123",
+    "avatar": "https://i.pravatar.cc/100?u=%D0%9C%D0%B0%D1%80%D0%B0%D1%82",
+    "nickname": "Марат",
+    "birthplace": "",
+    "birthyear": "",
+    "bio": "Demo user",
+    "registeredAt": "2026-06-11T16:41:04.057Z"
+  },
+  "Лиза": {
+    "password": "123",
+    "avatar": "https://i.pravatar.cc/100?u=%D0%9B%D0%B8%D0%B7%D0%B0",
+    "nickname": "Лиза",
+    "birthplace": "",
+    "birthyear": "",
+    "bio": "Demo user",
+    "registeredAt": "2026-06-11T16:41:04.057Z"
+  },
+  "Катя": {
+    "password": "123",
+    "avatar": "https://i.pravatar.cc/100?u=%D0%9A%D0%B0%D1%82%D1%8F",
+    "nickname": "Катя",
+    "birthplace": "",
+    "birthyear": "",
+    "bio": "Demo user",
+    "registeredAt": "2026-06-11T16:41:04.057Z"
+  },
+  "Юсуф1": {
+    "password": "1234",
+    "avatar": "https://i.pravatar.cc/100?u=%D0%AE%D1%81%D1%83%D1%841",
+    "nickname": "Юсуф1",
+    "birthplace": "",
+    "birthyear": "",
+    "bio": "",
+    "registeredAt": "2026-06-11T16:42:20.404Z"
+  }
+}
