@@ -188,11 +188,43 @@ wss.on('connection', (ws) => {
       } else if (data && data.type === 'user_update' && data.users) {
         // Просто ретранслируем обновлённый список пользователей остальным
         broadcast({ type: 'users', users: data.users });
+      } else if (data && data.type === 'user_update' && data.user) {
+        // Обновление одного пользователя — сохраним его в users.json и разошлём обновление
+        try {
+          const u = data.user;
+          if (u && u.name) {
+            users[u.name] = users[u.name] || {};
+            users[u.name].avatar = u.avatar || users[u.name].avatar;
+            if (u.nickname) users[u.name].nickname = u.nickname;
+            saveUsers(users);
+            // Broadcast single user update to other clients
+            broadcast({ type: 'user_update', user: { name: u.name, avatar: users[u.name].avatar, nickname: users[u.name].nickname, online: onlineUsers.has(u.name) } });
+          }
+        } catch (e) { console.warn('user_update single failed', e); }
       } else if (data && data.type === 'presence' && data.username) {
         // Клиент сообщил о своём присутствии
         ws.username = data.username;
         onlineUsers.add(data.username);
         broadcastUsers();
+      } else if (data && data.type === 'call_request' && data.to) {
+        // Передаём запрос на звонок конкретному пользователю
+        const targetCall = Array.from(wss.clients).find(c => c.username === data.to && c.readyState === WebSocket.OPEN);
+        if (targetCall) targetCall.send(JSON.stringify({ type: 'call_request', from: data.from, kind: data.kind || 'audio' }));
+      } else if (data && data.type === 'call_accept' && data.to) {
+        const targetAccept = Array.from(wss.clients).find(c => c.username === data.to && c.readyState === WebSocket.OPEN);
+        if (targetAccept) targetAccept.send(JSON.stringify({ type: 'call_accept', from: data.from }));
+      } else if (data && data.type === 'call_reject' && data.to) {
+        const targetReject = Array.from(wss.clients).find(c => c.username === data.to && c.readyState === WebSocket.OPEN);
+        if (targetReject) targetReject.send(JSON.stringify({ type: 'call_reject', from: data.from }));
+      } else if (data && data.type === 'webrtc_offer' && data.to && data.offer) {
+        const targetOffer = Array.from(wss.clients).find(c => c.username === data.to && c.readyState === WebSocket.OPEN);
+        if (targetOffer) targetOffer.send(JSON.stringify({ type: 'webrtc_offer', from: data.from, offer: data.offer }));
+      } else if (data && data.type === 'webrtc_answer' && data.to && data.answer) {
+        const targetAnswer = Array.from(wss.clients).find(c => c.username === data.to && c.readyState === WebSocket.OPEN);
+        if (targetAnswer) targetAnswer.send(JSON.stringify({ type: 'webrtc_answer', from: data.from, answer: data.answer }));
+      } else if (data && data.type === 'webrtc_ice' && data.to && data.candidate) {
+        const targetIce = Array.from(wss.clients).find(c => c.username === data.to && c.readyState === WebSocket.OPEN);
+        if (targetIce) targetIce.send(JSON.stringify({ type: 'webrtc_ice', from: data.from, candidate: data.candidate }));
       } else if (data && data.type === 'msg_delete' && data.id) {
         // Ретранслируем событие удаления сообщения другим клиентам
         broadcast({ type: 'msg_delete', id: data.id, from: data.from, to: data.to });

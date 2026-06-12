@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="animated-bg" aria-hidden="true"></div>
+    <!-- Intro video removed per user request -->
 
     <!-- Экран входа (как в Telegram Desktop) -->
     <div id="auth-screen" class="auth-screen">
@@ -52,7 +54,7 @@
                 <div class="team-avatars" aria-hidden="true"></div>
                 <div class="team-zero">ZERO</div>
             </div>
-            <p class="auth-footer">🔥 Zapretka Demo</p>
+
         </div>
     </div>
 
@@ -260,14 +262,7 @@
         <div class="modal-content avatar-picker-content">
             <h3>Выберите аватар</h3>
             <div class="avatar-picker-grid" id="avatar-picker-grid">
-                <img src="assets/avatars/avatar1.svg" class="avatar-option" onclick="selectPresetAvatar('assets/avatars/avatar1.svg')" alt="avatar1">
-                <img src="assets/avatars/avatar2.svg" class="avatar-option" onclick="selectPresetAvatar('assets/avatars/avatar2.svg')" alt="avatar2">
-                <img src="assets/avatars/avatar3.svg" class="avatar-option" onclick="selectPresetAvatar('assets/avatars/avatar3.svg')" alt="avatar3">
-                <img src="assets/avatars/avatar4.svg" class="avatar-option" onclick="selectPresetAvatar('assets/avatars/avatar4.svg')" alt="avatar4">
-                <img src="assets/avatars/avatar5.svg" class="avatar-option" onclick="selectPresetAvatar('assets/avatars/avatar5.svg')" alt="avatar5">
-                <img src="assets/avatars/avatar6.svg" class="avatar-option" onclick="selectPresetAvatar('assets/avatars/avatar6.svg')" alt="avatar6">
-                <img src="assets/avatars/avatar7.svg" class="avatar-option" onclick="selectPresetAvatar('assets/avatars/avatar7.svg')" alt="avatar7">
-                <img src="assets/avatars/avatar8.svg" class="avatar-option" onclick="selectPresetAvatar('assets/avatars/avatar8.svg')" alt="avatar8">
+                <!-- Пустая сетка; аватары подгружаются динамически через script.js (presetAvatars) -->
             </div>
             <div style="display:flex; gap:8px; margin-top:12px;">
                 <button onclick="closeModal('avatar-picker-modal')" style="flex:1;">Отмена</button>

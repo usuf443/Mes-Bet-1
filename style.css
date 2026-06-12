@@ -11,6 +11,37 @@
 }
 
 body.light-theme {
+
+/* Animated background gradient (red-purple flow) */
+.animated-bg {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background: linear-gradient(120deg, #3b023b 0%, #6e0036 25%, #b32d6a 50%, #7c3aed 75%, #2b003b 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 18s ease infinite;
+    filter: blur(40px) saturate(120%);
+    opacity: 0.92;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    25% { background-position: 50% 25%; }
+    50% { background-position: 100% 50%; }
+    75% { background-position: 50% 75%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Slight overlay for depth */
+.animated-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(255,255,255,0.02), rgba(0,0,0,0.15));
+}
     --bg-dark: #f5f5f5;
     --bg-gradient: linear-gradient(135deg, #f5f5f5, #e0e0e0, #ffffff);
     --accent-pink: #1976d2;
@@ -101,6 +132,8 @@ body, html {
     transition: transform 0.03s ease;
 }
 
+/* Intro video removed */
+
 @keyframes slideUp {
     from {
         opacity: 0;
@@ -121,14 +154,13 @@ body, html {
 .auth-screen {
     position: fixed;
     inset: 0;
-    background: linear-gradient(135deg, #1a0f0f 0%, #2d1515 25%, #4a0000 50%, #3d0000 75%, #1a0f0f 100%);
+    background: rgba(8, 4, 12, 0.92);
+    backdrop-filter: blur(16px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10000;
     overflow: hidden;
-    background-size: 400% 400%;
-    animation: gradientShift 8s ease infinite;
 }
 
 /* Первая анимированная фигура - верхний правый угол */
@@ -343,9 +375,16 @@ body, html {
 .main-app {
     display: none;
     height: 100vh;
-    display: grid;
     grid-template-columns: 320px 1fr 260px; /* левый сайдбар, центр чат, правый сайдбар */
 }
+
+/* Make panels semi-transparent so animated background shows through */
+.sidebar { background: rgba(8,6,8,0.82); }
+.chat-main { background: linear-gradient(180deg, rgba(6,4,6,0.95), rgba(6,4,6,0.88)); }
+.right-panel { background: rgba(8,6,8,0.78); }
+
+/* Ensure main app content renders above animated background */
+.main-app { position: relative; z-index: 100; }
 
 /* Сайдбар */
 .sidebar {
@@ -632,6 +671,9 @@ body, html {
     padding: 10px 12px 20px 12px;
     border-top: 1px solid var(--glass-border);
 }
+
+/* Скрываем секцию архива по умолчанию (скрыть визуально) */
+.archived-section { display: none !important; }
 
 .archived-title {
     font-size: 13px;

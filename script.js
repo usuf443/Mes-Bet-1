@@ -132,6 +132,18 @@ if (channel) {
                 data.users.forEach(u => users.push({ name: u.name, avatar: u.avatar, online: !!u.online }));
                 renderContacts();
             } catch (err) { /* безопасно игнорируем */ }
+        } else if (data.type === 'user_update' && data.user) {
+            // Получили обновление одного пользователя — применяем локально
+            try {
+                const u = data.user;
+                const idx = (users || []).findIndex(x => x.name === u.name);
+                if (idx > -1) {
+                    users[idx] = Object.assign({}, users[idx], { avatar: u.avatar, nickname: u.nickname });
+                } else {
+                    users.push({ name: u.name, avatar: u.avatar, online: !!u.online });
+                }
+                renderContacts();
+            } catch (err) { /* ignore */ }
         } else if (data.type === 'contacts_update' && Array.isArray(data.contacts)) {
             // Обновляем контакты текущего пользователя
             try {
@@ -174,6 +186,65 @@ function initWebSocket() {
                         data.users.forEach(u => users.push({ name: u.name, avatar: u.avatar, online: !!u.online }));
                         renderContacts();
                     } catch (e) { /* ignore */ }
+                } else if (data.type === 'call_request' && data.from) {
+                    // Входящий запрос на звонок
+                    currentCall = { type: data.kind === 'video' ? 'video' : 'audio', peer: data.from, incoming: true };
+                    showCallModal();
+                } else if (data.type === 'call_accept' && data.from) {
+                    // Собеседник принял вызов — начнём WebRTC как звонящий
+                    if (!currentCall || currentCall.peer !== data.from) {
+                        currentCall = { type: 'audio', peer: data.from, incoming: false };
+                    }
+                    (async () => {
+                        const kind = currentCall.type || 'audio';
+                        const local = await startLocalMedia(kind);
+                        createPeerConnection(data.from);
+                        if (local && pc) {
+                            local.getTracks().forEach(t => pc.addTrack(t, local));
+                        }
+                        try {
+                            const offer = await pc.createOffer();
+                            await pc.setLocalDescription(offer);
+                            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'webrtc_offer', to: data.from, from: me.name, offer: offer }));
+                        } catch (err) { console.warn('offer failed', err); }
+                    })();
+                } else if (data.type === 'call_reject' && data.from) {
+                    // Отклонение или завершение вызова
+                    if (currentCall && currentCall.peer === data.from) {
+                        hangupCall();
+                        cleanupPeer();
+                    }
+                } else if (data.type === 'webrtc_offer' && data.offer && data.from) {
+                    // Получили SDP offer — это callee
+                    (async () => {
+                        currentCall = { type: currentCall && currentCall.type ? currentCall.type : 'audio', peer: data.from, incoming: false };
+                        const kind = currentCall.type || 'audio';
+                        const local = await startLocalMedia(kind);
+                        createPeerConnection(data.from);
+                        try {
+                            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                            if (local) local.getTracks().forEach(t => pc.addTrack(t, local));
+                            const answer = await pc.createAnswer();
+                            await pc.setLocalDescription(answer);
+                            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'webrtc_answer', to: data.from, from: me.name, answer: answer }));
+                            onCallConnected();
+                        } catch (err) { console.warn('handle offer failed', err); }
+                    })();
+                } else if (data.type === 'webrtc_answer' && data.answer && data.from) {
+                    (async () => {
+                        try {
+                            if (pc) {
+                                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                                onCallConnected();
+                            }
+                        } catch (err) { console.warn('set answer failed', err); }
+                    })();
+                } else if (data.type === 'webrtc_ice' && data.candidate && data.from) {
+                    if (pc) {
+                        pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(err => {
+                            console.warn('addIce failed', err);
+                        });
+                    }
                 }
             } catch (err) { console.warn('WS msg parse', err); }
         });
@@ -222,11 +293,12 @@ function showMessageNotification(msg) {
         document.body.appendChild(container);
     }
 
-    const el = document.createElement('div');
-    el.className = 'floating-note';
-    el.style.pointerEvents = 'auto';
-    el.innerHTML = `
-        <div class="note-left"><img src="${getAvatarUrl(msg.from,48)}" class="note-avatar"/></div>
+        const el = document.createElement('div');
+        el.className = 'floating-note';
+        el.style.pointerEvents = 'auto';
+        const avatarSrc = getAvatarUrl(msg.from,48);
+        el.innerHTML = `
+        <div class="note-left"><img src="${avatarSrc}" class="note-avatar" data-user-name="${escapeHtml(msg.from)}"/></div>
         <div class="note-body">
             <div class="note-title">${escapeHtml(msg.from)}</div>
             <div class="note-text">${escapeHtml(truncate(msg.text || '', 80))}</div>
@@ -240,6 +312,9 @@ function showMessageNotification(msg) {
     };
 
     container.appendChild(el);
+    // attach fallback for avatar in notification
+    const notifImg = el.querySelector('img.note-avatar');
+    if (notifImg) attachAvatarFallback(notifImg, msg.from, 48);
     // Анимация появления
     requestAnimationFrame(() => {
         el.style.transition = 'transform 0.35s cubic-bezier(.2,.9,.2,1), opacity 0.35s ease';
@@ -296,17 +371,40 @@ function getAvatarUrl(name, size = 48) {
     // 1. Проверяем localStorage (актуальный профиль)
     const saved = JSON.parse(localStorage.getItem('zapretka_user_' + name) || 'null');
     if (saved && saved.avatar) {
+        // Если это data: или blob: или относительный путь к локальному файлу — возвращаем как есть
+        const a = saved.avatar;
+        if (a.startsWith('data:') || a.startsWith('blob:') || a.startsWith('/') || a.startsWith('./') || a.startsWith('../') || a.startsWith('assets/')) {
+            return a;
+        }
         try {
-            const url = new URL(saved.avatar);
-            if (url.hostname.includes('pravatar.cc')) {
+            const url = new URL(a);
+            if (url.hostname && url.hostname.includes('pravatar.cc')) {
                 return `https://i.pravatar.cc/${size}?u=${encodeURIComponent(name)}`;
             }
-        } catch (e) {}
-        return saved.avatar;
+            // любой другой абсолютный URL — возвращаем как есть
+            return a;
+        } catch (e) {
+            // Если не удалось распарсить — возвращаем исходное значение
+            return a;
+        }
     }
     // Если есть users (серверные/встроенные) и у пользователя есть avatar — используем
     const uFromList = (users || []).find(x => x.name === name && x.avatar);
-    if (uFromList && uFromList.avatar) return uFromList.avatar.replace(/\?u=.*$/, '') + `?u=${encodeURIComponent(name)}`;
+    if (uFromList && uFromList.avatar) {
+        const a = uFromList.avatar;
+        if (a.startsWith('data:') || a.startsWith('blob:') || a.startsWith('/') || a.startsWith('./') || a.startsWith('assets/')) {
+            return a;
+        }
+        try {
+            const url = new URL(a);
+            if (url.hostname && url.hostname.includes('pravatar.cc')) {
+                return `https://i.pravatar.cc/${size}?u=${encodeURIComponent(name)}`;
+            }
+            return a;
+        } catch (e) {
+            return a;
+        }
+    }
     // 2. Мой профиль (me)
     if (me && me.name === name && me.avatar) {
         return me.avatar;
@@ -530,13 +628,13 @@ function renderArchivedList() {
         
         const left = document.createElement('div');
         left.className = 'archived-left';
-        const img = document.createElement('img');
-        img.src = avatarUrl;
-        img.className = 'chat-avatar-small';
-        img.style.width = '32px';
-        img.style.height = '32px';
-        img.style.borderRadius = '50%';
-        img.onerror = function() { this.onerror = null; this.src = 'https://i.pravatar.cc/32?u=' + encodeURIComponent(name); };
+                const img = document.createElement('img');
+                img.src = avatarUrl;
+                img.className = 'chat-avatar-small';
+                img.style.width = '32px';
+                img.style.height = '32px';
+                img.style.borderRadius = '50%';
+                attachAvatarFallback(img, name, 32);
         left.appendChild(img);
         
         const info = document.createElement('div');
@@ -685,7 +783,7 @@ function addContactToSidebar(name, emoji, avatarUrl, previewText) {
     
     div.innerHTML = `
         <div style="position: relative;">
-            <img src="${finalAvatar}" class="chat-avatar-small" onerror="this.onerror=null; this.src='https://i.pravatar.cc/48?u=${encodeURIComponent(name)}'">
+            <img src="${finalAvatar}" class="chat-avatar-small" data-user-name="${escapeHtml(name)}">
             ${(!isBot && isOnline) ? '<div class="online-dot"></div>' : ''}
         </div>
         <div class="chat-info">
@@ -711,7 +809,10 @@ function addContactToSidebar(name, emoji, avatarUrl, previewText) {
     
     // Примечание: удаление контакта выполняется через popup действий (удалить)
     
+    // После вставки присоединяем механизм fallback для картинок
     list.appendChild(div);
+    const imgEl = div.querySelector('img.chat-avatar-small');
+    if (imgEl) attachAvatarFallback(imgEl, name, 48);
 }
 
 function setActiveChat(name, element) {
@@ -726,11 +827,14 @@ function setActiveChat(name, element) {
     const activeBots = getActiveBots();
     const isBot = activeBots.includes(name);
     
+    const currentAvatarEl = document.getElementById('current-chat-avatar');
+    if (currentAvatarEl) {
+        currentAvatarEl.src = getAvatarUrl(name, 48);
+        attachAvatarFallback(currentAvatarEl, name, 48);
+    }
     if (isBot) {
-        document.getElementById('current-chat-avatar').src = getAvatarUrl(name, 48);
         document.getElementById('current-chat-subtitle').innerText = '🤖 Бот | Статус: онлайн';
     } else {
-        document.getElementById('current-chat-avatar').src = getAvatarUrl(name, 48);
         const userEntry = (users || []).find(u => u.name === name);
         const isOnline = !!(userEntry && userEntry.online);
         // Убираем символы кружков — показываем только текст статуса
@@ -850,7 +954,7 @@ function renderMessages() {
             let avatarHtml = '';
             if (m.from !== me.name) {
                 const avatarUrl = getAvatarUrl(m.from, 32);
-                avatarHtml = `<div class="msg-meta"><img src="${avatarUrl}" class="msg-avatar"> <span class="msg-sender">${m.from}</span></div>`;
+                avatarHtml = `<div class="msg-meta"><img src="${avatarUrl}" class="msg-avatar" data-user-name="${escapeHtml(m.from)}"> <span class="msg-sender">${m.from}</span></div>`;
             }
 
             // Проверяем тип сообщения
@@ -892,7 +996,7 @@ function renderMessages() {
                 let avatarHtml = '';
                 if (m.from !== me.name) {
                     const avatarUrl = getAvatarUrl(m.from, 32);
-                    avatarHtml = `<div class="msg-meta"><img src="${avatarUrl}" class="msg-avatar"> <span class="msg-sender">${m.from}</span></div>`;
+                        avatarHtml = `<div class="msg-meta"><img src="${avatarUrl}" class="msg-avatar" data-user-name="${escapeHtml(m.from)}"> <span class="msg-sender">${m.from}</span></div>`;
                 }
 
                 // Проверяем тип сообщения
@@ -929,7 +1033,7 @@ function renderMessages() {
                 let avatarHtml = '';
                 if (m.from !== me.name) {
                     const avatarUrl = getAvatarUrl(m.from, 32);
-                    avatarHtml = `<div class="msg-meta"><img src="${avatarUrl}" class="msg-avatar"> <span class="msg-sender">${m.from}</span></div>`;
+                        avatarHtml = `<div class="msg-meta"><img src="${avatarUrl}" class="msg-avatar" data-user-name="${escapeHtml(m.from)}"> <span class="msg-sender">${m.from}</span></div>`;
                 }
 
                 let bodyContent = m.text;
@@ -960,6 +1064,16 @@ function renderMessages() {
 
     // Обновляем состояние кнопки "вниз"
     updateScrollButton();
+    // После рендера сообщений — прикрепим fallback ко всем аватарам внутри чата
+    setTimeout(() => {
+        try {
+            const imgs = document.querySelectorAll('#chat-box img.msg-avatar');
+            imgs.forEach(img => {
+                const nm = img.dataset.userName || activeContact || 'anon';
+                attachAvatarFallback(img, nm, 32);
+            });
+        } catch (e) {}
+    }, 10);
 }
 
 function syncMessages() {
@@ -1076,9 +1190,11 @@ function updateAvatarFromModal(event) {
             updateUserData(me.name, { avatar: me.avatar });  // Обновляем профиль в регистрации
             updateUserInData(me);
             try { localStorage.setItem('zapretka_user_' + me.name, JSON.stringify(me)); } catch (e) {}
-            if (channel) channel.postMessage({ type: 'user_update', users });
+            // Отправим только обновлённого пользователя через BroadcastChannel и WebSocket
+            const single = { name: me.name, avatar: me.avatar, nickname: me.nickname };
+            if (channel) channel.postMessage({ type: 'user_update', user: single });
             if (ws && ws.readyState === WebSocket.OPEN) {
-                try { ws.send(JSON.stringify({ type: 'user_update', users })); } catch (e) {}
+                try { ws.send(JSON.stringify({ type: 'user_update', user: single })); } catch (e) {}
             }
             renderContacts();
             renderMessages();
@@ -1099,6 +1215,28 @@ const presetAvatars = [
     'assets/avatars/avatar8.jpg'
 ];
 
+// Универсальная функция для установки fallback аватара при ошибке загрузки
+function attachAvatarFallback(imgEl, name, size) {
+    if (!imgEl) return;
+    imgEl.onerror = function() {
+        try {
+            this.onerror = null;
+            // Попробуем локальные аватарки в assets/avatars
+            const base = 'assets/avatars/' + encodeURIComponent(name).replace(/%20/g, '_').toLowerCase();
+            // сначала JPG/PNG
+            const candidate = base + '.jpg';
+            fetch(candidate, { method: 'HEAD' }).then(resp => {
+                if (resp.ok) {
+                    imgEl.src = candidate;
+                } else {
+                    // используем дефолтный SVG
+                    imgEl.src = 'assets/avatars/default-avatar.svg';
+                }
+            }).catch(() => { imgEl.src = 'assets/avatars/default-avatar.svg'; });
+        } catch (e) { this.src = 'assets/avatars/default-avatar.svg'; }
+    };
+}
+
 function openAvatarPicker() {
     const modal = document.getElementById('avatar-picker-modal');
     if (!modal) return;
@@ -1106,18 +1244,11 @@ function openAvatarPicker() {
     if (grid) {
         grid.innerHTML = '';
         presetAvatars.forEach((url, idx) => {
-            const img = document.createElement('img');
-            img.className = 'avatar-option';
-            img.alt = 'avatar' + (idx + 1);
-            img.src = url;
-            // если JPG не найден — пробуем SVG с тем же именем
-            img.onerror = function() {
-                if (img.src.endsWith('.jpg') || img.src.endsWith('.jpeg') || img.src.endsWith('.png')) {
-                    const svgPath = url.replace(/\.(jpg|jpeg|png)$/i, '.svg');
-                    img.onerror = null; // не зацикливаемся
-                    img.src = svgPath;
-                }
-            };
+                const img = document.createElement('img');
+                img.className = 'avatar-option';
+                img.alt = 'avatar' + (idx + 1);
+                img.src = url;
+                attachAvatarFallback(img, 'avatar' + (idx + 1), 100);
             img.onclick = function() { selectPresetAvatar(img.src); };
             grid.appendChild(img);
         });
@@ -1135,9 +1266,10 @@ function selectPresetAvatar(url) {
     updateUserData(me.name, { avatar: me.avatar });
     updateUserInData(me);
     try { localStorage.setItem('zapretka_user_' + me.name, JSON.stringify(me)); } catch (e) {}
-    if (channel) channel.postMessage({ type: 'user_update', users });
+    const single = { name: me.name, avatar: me.avatar, nickname: me.nickname };
+    if (channel) channel.postMessage({ type: 'user_update', user: single });
     if (ws && ws.readyState === WebSocket.OPEN) {
-        try { ws.send(JSON.stringify({ type: 'user_update', users })); } catch (e) { /* ignore */ }
+        try { ws.send(JSON.stringify({ type: 'user_update', user: single })); } catch (e) { /* ignore */ }
     }
     renderContacts();
     renderMessages();
@@ -1369,6 +1501,7 @@ function importData(e) {
 document.addEventListener('DOMContentLoaded', () => {
     // ...existing code...
     // Обработка выбора пунктов меню приложения
+    // intro video removed
     function handleMenuAction(action) {
         if (action === 'settings') {
             openSettingsModal();
@@ -1396,6 +1529,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('notif-status').innerText = notif ? 'Включены' : 'Выключены';
     }
 });
+
+// Intro video logic
+// intro video removed
 
 function initCursorLight() {
     const light = document.createElement('div');
@@ -1706,15 +1842,25 @@ let callStartTimestamp = 0;
 let callConnectTimeout = null;
 let isMuted = false;
 let isCameraOn = true;
+// WebRTC state
+let pc = null; // RTCPeerConnection
+let localStream = null;
+let remoteStream = null;
+let isCallConnected = false;
 
 function startCall() {
+    if (!activeContact) return alert('Выберите чат для звонка');
     currentCall = { type: 'audio', peer: activeContact, incoming: false };
     showCallModal();
+    // Отправляем запрос на звонок через signaling (ws)
+    try { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'call_request', to: currentCall.peer, from: me.name, kind: 'audio' })); } catch (e) {}
 }
 
 function startVideoCall() {
+    if (!activeContact) return alert('Выберите чат для звонка');
     currentCall = { type: 'video', peer: activeContact, incoming: false };
     showCallModal();
+    try { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'call_request', to: currentCall.peer, from: me.name, kind: 'video' })); } catch (e) {}
 }
 
 function showCallModal() {
@@ -1781,7 +1927,8 @@ function onCallConnected() {
 function acceptCall() {
     // Принять входящий вызов
     if (currentCall) currentCall.incoming = false;
-    onCallConnected();
+    // Сообщим серверу что мы приняли
+    try { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'call_accept', to: currentCall.peer, from: me.name })); } catch (e) {}
     const acceptBtn = document.getElementById('accept-btn');
     if (acceptBtn) acceptBtn.disabled = true;
 }
@@ -1793,9 +1940,14 @@ function hangupCall() {
         modal.classList.remove('connected');
         modal.onclick = null;
     }
+    const peerToNotify = (currentCall && currentCall.peer) || activeContact;
     currentCall = null;
     if (callConnectTimeout) { clearTimeout(callConnectTimeout); callConnectTimeout = null; }
     stopCallTimer();
+    // Сообщим собеседнику что вызов завершён/отклонён
+    try { if (ws && ws.readyState === WebSocket.OPEN && peerToNotify) ws.send(JSON.stringify({ type: 'call_reject', to: peerToNotify, from: me.name })); } catch (e) {}
+    // Закроем peer connection и остановим медиапотоки
+    try { cleanupPeer(); } catch (e) {}
     // восстановим кнопки
     const acceptBtn = document.getElementById('accept-btn');
     if (acceptBtn) acceptBtn.disabled = false;
@@ -1805,6 +1957,56 @@ function hangupCall() {
     if (muteBtn) muteBtn.classList.remove('active');
     const camBtn = document.getElementById('video-toggle-btn');
     if (camBtn) camBtn.classList.remove('active');
+}
+
+// Create or reuse RTCPeerConnection and attach handlers
+function createPeerConnection(peerName) {
+    if (pc) return pc;
+    const cfg = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    pc = new RTCPeerConnection(cfg);
+    remoteStream = new MediaStream();
+    pc.onicecandidate = (e) => {
+        if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'webrtc_ice', to: peerName, from: me.name, candidate: e.candidate }));
+        }
+    };
+    pc.ontrack = (e) => {
+        try {
+            e.streams && e.streams[0] && (remoteStream = e.streams[0]);
+            // Attach audio/video element dynamically
+            attachRemoteStream(remoteStream);
+        } catch (err) { console.warn('ontrack', err); }
+    };
+    return pc;
+}
+
+function attachRemoteStream(stream) {
+    // Для аудио создаём элемент <audio>, для видео можно расширить
+    let audio = document.getElementById('call-remote-audio');
+    if (!audio) {
+        audio = document.createElement('audio');
+        audio.id = 'call-remote-audio';
+        audio.autoplay = true;
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
+    }
+    try { audio.srcObject = stream; } catch (e) { audio.src = URL.createObjectURL(stream); }
+}
+
+async function startLocalMedia(kind) {
+    if (localStream) return localStream;
+    const constraints = (kind === 'video') ? { audio: true, video: true } : { audio: true };
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        return localStream;
+    } catch (err) { console.warn('getUserMedia failed', err); return null; }
+}
+
+async function cleanupPeer() {
+    try { if (pc) { pc.close(); pc = null; } } catch (e) {}
+    try { if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; } } catch (e) {}
+    try { if (remoteStream) { remoteStream.getTracks().forEach(t=>t.stop()); remoteStream = null; } } catch (e) {}
+    const audio = document.getElementById('call-remote-audio'); if (audio) { audio.remove(); }
 }
 
 function startCallTimer() {
