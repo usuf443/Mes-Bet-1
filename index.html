@@ -82,7 +82,12 @@
 
             <!-- Секции (архив) -->
             <div class="sidebar-sections">
-                <div class="section-item" onclick="toggleArchivedSection()"><span>📦</span> Архив</div>
+                <div class="section-item" id="archive-folder-btn" onclick="enterArchiveFolder()">
+                    <span id="archive-back-sidebar" class="archive-back-sidebar" style="display:none; cursor:pointer;" onclick="event.stopPropagation(); exitArchiveFolder();">←</span>
+                    <span class="archive-emoji">📦</span>
+                    <span class="archive-label">Архив</span>
+                    <span id="archive-count" class="archive-count-badge"></span>
+                </div>
             </div>
 
             <!-- Список чатов -->
@@ -91,9 +96,10 @@
             </div>
             
             <!-- Архив -->
-            <div class="archived-section">
+            <div class="archived-section" style="display:none;">
                 <h3 class="archived-title">Архив</h3>
                 <div id="archived-list" class="archived-list"></div>
+                <div style="padding:8px; text-align:center; color:#999;" id="archived-empty">Архив пуст</div>
             </div>
         </aside>
 
@@ -265,6 +271,7 @@
             </div>
             <div style="display:flex; gap:8px; margin-top:12px;">
                 <button onclick="closeModal('avatar-picker-modal')" style="flex:1;">Отмена</button>
+                <button onclick="closeModal('avatar-picker-modal')" style="flex:1; background: linear-gradient(45deg,#2AABEE,#1e9ed1); color:#fff;">Готово</button>
                 <button onclick="document.getElementById('avatar-input-modal').click()" style="flex:1;">Загрузить свой</button>
             </div>
         </div>
@@ -280,10 +287,23 @@
                 <div id="call-peer" class="call-peer">Zapret Bot</div>
                 <div id="call-type" class="call-type">Исходящий звонок</div>
                 <div id="call-status" class="call-status">Инициализация...</div>
+                <div id="call-timer" class="call-timer" style="display:none; margin-top:8px; font-weight:700; color: #fff;">00:00</div>
             </div>
-            <div class="call-actions">
-                <button class="call-btn accept" onclick="acceptCall()"><span class="call-icon">📞</span> Принять</button>
-                <button class="call-btn decline" onclick="hangupCall()"><span class="call-icon">⏹️</span> Завершить</button>
+
+            <div id="incoming-actions" style="display:none; gap:12px; margin-top:12px; justify-content:center;">
+                <button id="accept-btn" class="call-btn accept" onclick="acceptCall()">Принять</button>
+                <button class="call-btn decline" onclick="hangupCall()">Отклонить</button>
+            </div>
+
+            <div id="outgoing-actions" class="call-actions">
+                <button class="call-btn decline" onclick="hangupCall()">Отменить</button>
+            </div>
+
+            <div id="connected-controls" class="call-actions" style="display:none;">
+                <button id="mute-btn" class="call-btn" onclick="toggleMute()">🔇</button>
+                <button id="video-toggle-btn" class="call-btn" onclick="toggleCamera()">🎥</button>
+                <button class="call-btn" onclick="addParticipant()">➕</button>
+                <button class="call-btn decline" onclick="hangupCall()">Завершить</button>
             </div>
         </div>
     </div>
@@ -374,7 +394,65 @@
     </div>
 
     <!-- Скрипты -->
-    <script src="data.js"></script>
+        <!-- Встроенный кэш пользователей: нужно для работы поиска при открытии index.html по file:// -->
+        <script>
+                window.__embedded_users = {
+    "Юсуф": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%AE%D1%81%D1%83%D1%84",
+        "nickname": "Юсуф",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.056Z"
+    },
+    "Али": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%90%D0%BB%D0%B8",
+        "nickname": "Али",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.057Z"
+    },
+    "Марат": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%9C%D0%B0%D1%80%D0%B0%D1%82",
+        "nickname": "Марат",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.057Z"
+    },
+    "Лиза": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%9B%D0%B8%D0%B7%D0%B0",
+        "nickname": "Лиза",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.057Z"
+    },
+    "Катя": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%9A%D0%B0%D1%82%D1%8F",
+        "nickname": "Катя",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.057Z"
+    },
+    "Юсуф1": {
+        "password": "1234",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%AE%D1%81%D1%83%D1%841",
+        "nickname": "Юсуф1",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "",
+        "registeredAt": "2026-06-11T16:42:20.404Z"
+    }
+};
+        </script>
     <!-- Подключение основных скриптов в правильном порядке -->
     <script src="data.js"></script>
     <script src="auth.js"></script>

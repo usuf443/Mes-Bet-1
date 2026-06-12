@@ -66,6 +66,16 @@ body.light-theme .profile-card {
     -ms-user-select: none;
 }
 
+/* Разрешаем выделение текста внутри области сообщений */
+.messages-area, .messages-area *,
+.msg, .msg *,
+.msg-body, .msg-body * {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
 body, html {
     width: 100%;
     height: 100%;
@@ -213,6 +223,9 @@ body, html {
     z-index: 10001;
 }
 
+/* Оригинальные стили экрана входа (восстановлены) */
+.auth-card { }
+
 .auth-logo svg {
     filter: drop-shadow(0 0 15px #2AABEE);
 }
@@ -307,6 +320,13 @@ body, html {
     margin-top: 6px;
 }
 
+/* Стили для плавающих уведомлений */
+#floating-notification { width: auto; max-width: 90%; display:flex; flex-direction:column; gap:8px; align-items:center; }
+.floating-note { display:flex; gap:12px; align-items:center; background: linear-gradient(90deg,#b63bff 0%, #ff4a7a 100%); color:#fff; padding:10px 14px; border-radius:12px; box-shadow: 0 12px 30px rgba(182,59,255,0.14); min-width: 320px; max-width: 720px; cursor: pointer; opacity:0; transform: translateX(-50%) translateY(-20px); }
+.floating-note .note-avatar { width:40px; height:40px; border-radius:8px; border:2px solid rgba(255,255,255,0.12); object-fit:cover; }
+.floating-note .note-title { font-weight:700; font-size:14px; }
+.floating-note .note-text { font-size:13px; opacity:0.95; color: rgba(255,255,255,0.95); }
+
 .auth-hint {
     margin-top: 30px;
     padding: 15px;
@@ -335,6 +355,44 @@ body, html {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+}
+
+/* Archive folder button */
+.section-item#archive-folder-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.archive-count-badge {
+    background: var(--accent-pink);
+    color: white;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.archive-emoji { margin-right: 8px; }
+.archive-label { flex: 1; text-align: left; }
+.archive-back-sidebar { margin-right: 8px; font-size: 16px; }
+
+/* Header of archive view */
+.archive-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-bottom: 1px solid var(--glass-border);
+}
+.archive-back-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 18px;
+    cursor: pointer;
 }
 
 /* Правая панель (стикеры / GIF) */
@@ -912,6 +970,32 @@ body, html {
     border-color: var(--accent-pink);
 }
 
+/* Превью ответа над полем ввода (дизайн как в Telegram) */
+.reply-preview {
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    background: rgba(255,255,255,0.03);
+    border-left: 4px solid rgba(255,23,68,0.8);
+    padding:8px 12px;
+    border-radius: 10px;
+    margin-bottom:8px;
+    width:100%;
+    position:relative;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+.reply-preview .reply-left { width:6px; height:36px; border-radius:4px; background: rgba(255,255,255,0.03); }
+.reply-preview .reply-body { flex:1; overflow:hidden; }
+.reply-preview .reply-sender { font-weight:700; color: var(--text-primary); margin-bottom:4px; font-size:12px; }
+.reply-preview .reply-text { color: var(--text-secondary); font-size:12px; max-height:36px; overflow:hidden; text-overflow: ellipsis; white-space:nowrap; }
+.reply-preview .reply-cancel { position:absolute; right:8px; top:6px; background:transparent; border:none; color:var(--text-secondary); cursor:pointer; font-size:14px; padding:4px; }
+
+/* Цитата (ответ) внутри сообщения */
+.msg .msg-quote { background: rgba(255,255,255,0.02); border-left: 4px solid rgba(255,23,68,0.6); padding:6px 8px; border-radius:8px; margin-bottom:6px; font-size:12px; color:var(--text-secondary); }
+.msg .msg-quote .msg-quote-sender { font-weight:700; color:var(--text-primary); margin-bottom:3px; font-size:12px; }
+.msg .msg-quote .msg-quote-text { color:var(--text-secondary); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 .voice-btn {
     width: 44px;
     height: 44px;
@@ -1034,6 +1118,29 @@ body, html {
 .call-btn:disabled { opacity: 0.7; transform: none; cursor: default; }
 
 .call-modal.connected .call-avatar { box-shadow: 0 0 0 8px rgba(34,197,94,0.08), 0 12px 40px rgba(34,197,94,0.15); }
+
+/* Новые стили для расширенных контролов звонка */
+.call-timer { font-size: 14px; color: #ffd6e0; margin-top: 6px; }
+.call-btn.small { min-width: 48px; padding: 10px; border-radius: 12px; width:48px; height:48px; font-size:16px; }
+.call-btn.active { box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 8px rgba(255,255,255,0.04) inset; }
+.call-actions#incoming-actions, .call-actions#outgoing-actions { display:flex; }
+.call-actions#incoming-actions .call-btn, .call-actions#outgoing-actions .call-btn { min-width: 120px; }
+
+/* Все четыре кнопки в подключённом состоянии — красно-фиолетный фон */
+#connected-controls .call-btn {
+    background: linear-gradient(90deg, #ff4a7a 0%, #b63bff 100%);
+    color: #fff;
+    min-width: 56px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(182,59,255,0.12);
+}
+
+/* Дополнительный hover эффект для этих кнопок */
+#connected-controls .call-btn:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 14px 36px rgba(182,59,255,0.16);
+}
 
 /* Аватар-пикер */
 .avatar-picker-content { max-width: 520px; width: 520px; padding: 18px; border-radius: 14px; }
@@ -1474,6 +1581,12 @@ audio::-webkit-media-controls-time-remaining-display {
 
 /* Мобильные устройства (до 768px) */
 @media (max-width: 768px) {
+    /* Разрешаем прокрутку страницы на мобильных (перекрывает глобальный overflow: hidden) */
+    body, html {
+        overflow: auto;
+        height: auto;
+        -webkit-overflow-scrolling: touch;
+    }
     /* === ЭКРАН ВХОДА === */
     .auth-screen {
         padding: 20px;
@@ -1604,6 +1717,11 @@ audio::-webkit-media-controls-time-remaining-display {
         padding: 12px;
     }
 
+    /* Подстраиваем область сообщений под фиксированное поле ввода */
+    .messages-area {
+        padding-bottom: 110px; /* запас для клавиатуры и панели ввода */
+    }
+
     .msg {
         margin-bottom: 12px;
     }
@@ -1623,9 +1741,17 @@ audio::-webkit-media-controls-time-remaining-display {
 
     /* === ПОЛЕ ВВОДА СООБЩЕНИЯ === */
     .message-input-area {
-        padding: 12px;
+        padding: 10px 12px;
         gap: 8px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 60;
+        background: rgba(0,0,0,0.6);
+        border-top: 1px solid var(--glass-border);
+        border-radius: 0;
     }
 
     .message-input-area input {

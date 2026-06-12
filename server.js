@@ -34,6 +34,8 @@ function saveUsers(users) {
 }
 
 let users = loadUsers();
+// Набор онлайн-пользователей (имена)
+const onlineUsers = new Set();
 
 // Инициализация demo-пользователей на сервере, если файл пуст
 if (Object.keys(users).length === 0) {
@@ -166,15 +168,16 @@ function broadcast(obj) {
 }
 
 function broadcastUsers() {
-  const list = Object.keys(users).map(u => ({ name: u, avatar: users[u].avatar }));
+  const list = Object.keys(users).map(u => ({ name: u, avatar: users[u].avatar, online: onlineUsers.has(u) }));
   broadcast({ type: 'users', users: list });
 }
 
 wss.on('connection', (ws) => {
   console.log('client connected');
   ws.isAlive = true;
-  // Отправим список пользователей при подключении
-  ws.send(JSON.stringify({ type: 'users', users: Object.keys(users).map(u => ({ name: u, avatar: users[u].avatar })) }));
+  ws.username = null;
+  // Отправим список пользователей при подключении (с online-флагом)
+  ws.send(JSON.stringify({ type: 'users', users: Object.keys(users).map(u => ({ name: u, avatar: users[u].avatar, online: onlineUsers.has(u) })) }));
 
   ws.on('pong', () => { ws.isAlive = true; });
   ws.on('message', (message) => {
@@ -185,13 +188,32 @@ wss.on('connection', (ws) => {
       } else if (data && data.type === 'user_update' && data.users) {
         // Просто ретранслируем обновлённый список пользователей остальным
         broadcast({ type: 'users', users: data.users });
+      } else if (data && data.type === 'presence' && data.username) {
+        // Клиент сообщил о своём присутствии
+        ws.username = data.username;
+        onlineUsers.add(data.username);
+        broadcastUsers();
+      } else if (data && data.type === 'msg_delete' && data.id) {
+        // Ретранслируем событие удаления сообщения другим клиентам
+        broadcast({ type: 'msg_delete', id: data.id, from: data.from, to: data.to });
+      } else if (data && data.type === 'presence_off' && data.username) {
+        // Клиент явно ушёл
+        onlineUsers.delete(data.username);
+        if (ws.username === data.username) ws.username = null;
+        broadcastUsers();
       }
     } catch (err) {
       console.warn('Invalid message', err);
     }
   });
 
-  ws.on('close', () => console.log('client disconnected'));
+  ws.on('close', () => {
+    if (ws.username) {
+      onlineUsers.delete(ws.username);
+      broadcastUsers();
+    }
+    console.log('client disconnected');
+  });
 });
 
 // Пинг клиентов, чтобы убирать мёртвые соединения
