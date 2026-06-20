@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <title>Zapretgram</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="animated-bg" aria-hidden="true"></div>
+    <!-- Intro video removed per user request -->
+
+    <!-- Экран входа (как в Telegram Desktop) -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <img src="icon.jpg" alt="Zapretgram" style="width: 60px; height: 60px; border-radius: 15px; box-shadow: 0 0 20px rgba(255, 23, 68, 0.4);">
+            </div>
+            <h1>Zapretgram</h1>
+            <p class="auth-subtitle">Добро пожаловать в Zapretgram — приложение для общения.</p>
+            
+            <!-- Режим входа -->
+            <div id="login-mode">
+                <p class="auth-subtitle" style="font-size: 14px; margin-top: 10px;">Введите ваши учетные данные:</p>
+                <div class="auth-input-group">
+                    <input type="text" id="login-username" placeholder="Никнейм" autocomplete="off">
+                </div>
+                <div class="auth-input-group">
+                    <input type="password" id="login-password" placeholder="Пароль" autocomplete="off">
+                </div>
+                <button class="auth-next-btn" onclick="handleLogin()">Войти →</button>
+                <button class="auth-next-btn" style="margin-top:10px; background: linear-gradient(45deg, #4CAF50, #45a049);" onclick="switchToRegister()">Создать аккаунт</button>
+                <!-- Кнопка тестового звонка удалена по запросу -->
+            </div>
+            
+            <!-- Режим регистрации -->
+            <div id="register-mode" style="display: none;">
+                <p class="auth-subtitle" style="font-size: 14px; margin-top: 10px;">Создайте аккаунт:</p>
+                <div class="auth-input-group">
+                    <input type="text" id="register-username" placeholder="Выберите никнейм" autocomplete="off">
+                </div>
+                <div class="auth-input-group">
+                    <input type="password" id="register-password" placeholder="Придумайте пароль" autocomplete="off">
+                </div>
+                <div class="auth-input-group">
+                    <input type="password" id="register-password-confirm" placeholder="Подтвердите пароль" autocomplete="off">
+                </div>
+                <button class="auth-next-btn" onclick="handleRegister()">Зарегистрироваться →</button>
+                <button class="auth-next-btn" style="margin-top:10px; background: linear-gradient(45deg, #666, #555);" onclick="switchToLogin()">Уже есть аккаунт?</button>
+            </div>
+            
+            <div class="team-section">
+                <!-- Превью-аватарки удалены по запросу -->
+                <div class="team-avatars" aria-hidden="true"></div>
+                <div class="team-zero">ZERO</div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Основное приложение -->
+    <div id="main-app" class="main-app">
+        <!-- Боковая панель -->
+        <aside class="sidebar">
+            <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
+                <button class="burger-btn" onclick="openAppMenu()" title="Меню" style="color: #ff5252; background: transparent; font-size: 20px;">☰</button>
+                <button id="theme-toggle" class="theme-toggle" title="Переключить тему" onclick="toggleTheme()">🌙</button>
+            </div>
+            <!-- Профиль -->
+            <div class="profile-card" onclick="openProfileModal()">
+                <img src="https://i.pravatar.cc/40?u=me" alt="avatar" class="profile-avatar" id="my-avatar">
+                <div class="profile-info">
+                    <span class="profile-name" id="my-name">Loading...</span>
+                    <span class="profile-status">● Online</span>
+                </div>
+                <button class="profile-edit-btn" onclick="event.stopPropagation(); openProfileModal()">✎</button>
+            </div>
+
+            <!-- Поиск -->
+            <div class="search-box">
+                <input type="text" placeholder="Поиск" id="search-input">
+                <span class="search-icon">🔍</span>
+            </div>
+
+            <!-- Секции (архив) -->
+            <div class="sidebar-sections">
+                <div class="section-item" id="archive-folder-btn" onclick="enterArchiveFolder()">
+                    <span id="archive-back-sidebar" class="archive-back-sidebar" style="display:none; cursor:pointer;" onclick="event.stopPropagation(); exitArchiveFolder();">←</span>
+                    <span class="archive-emoji">📦</span>
+                    <span class="archive-label">Архив</span>
+                    <span id="archive-count" class="archive-count-badge"></span>
+                </div>
+            </div>
+
+            <!-- Список чатов -->
+            <div class="chats-list" id="contacts-list">
+                <!-- Динамически из JS -->
+            </div>
+
+            <!-- Секция архива для боковой панели -->
+            <div class="archived-section" style="display:none;">
+                <div class="archived-title">Архив</div>
+                <div id="archived-list" class="archived-list"></div>
+                <div id="archived-empty" style="padding: 12px 8px; color: var(--text-secondary);">Архив пуст</div>
+            </div>
+        </aside>
+
+        <!-- Основная область чата -->
+        <main class="chat-main">
+            <!-- Шапка чата -->
+            <div class="chat-header">
+                <div class="chat-header-left">
+                    <img src="" alt="" class="chat-avatar" id="current-chat-avatar">
+                    <div>
+                        <h2 id="current-chat-title">Zapret Bot</h2>
+                        <div class="chat-subtitle" id="current-chat-subtitle"></div>
+                        <small class="chat-status">online</small>
+                    </div>
+                </div>
+                <div class="chat-header-actions">
+                    <button class="mobile-only" onclick="toggleSidebar()" title="Открыть меню чатов">☰</button>
+                    <button onclick="searchInChat()">🔍</button>
+                    <button onclick="startCall()">📞</button>
+                    <button onclick="startVideoCall()">📹</button>
+                    <button id="archive-btn" onclick="toggleArchiveCurrentChat()" title="Архивировать/Восстановить чат">🗄️</button>
+                </div>
+            </div>
+
+            <!-- Сообщения -->
+            <div class="messages-area" id="chat-box"></div>
+
+            <!-- Архив (отображается вместо сообщений) -->
+            <div id="archive-view" class="archive-view" style="display: none; padding: 20px; overflow-y: auto; flex: 1;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                    <button onclick="exitArchiveFolder()" style="background: none; border: none; font-size: 24px; cursor: pointer;">←</button>
+                    <h2 style="margin: 0;">📦 Архив</h2>
+                </div>
+                <div id="archive-view-list"></div>
+            </div>
+
+            <!-- Контекстное меню для сообщений и чатов (удалено — используется единый блок внизу) -->
+
+            <!-- Кнопка быстрого перехода вниз (появляется при прокрутке вверх) -->
+            <button id="scroll-down-btn" class="scroll-down" onclick="scrollToBottom()" title="Перейти к последним сообщениям">↓</button>
+
+            <!-- Панель эмодзи -->
+            <div class="emoji-panel" id="emoji-shelf"></div>
+
+            <!-- Ввод сообщения -->
+            <div class="message-input-area">
+                <button class="attach-btn" onclick="document.getElementById('file-in').click()">📎</button>
+                <button id="voice-btn" class="voice-btn" onclick="toggleRecording()" title="Нажмите, чтобы записать голосовое">🎙️</button>
+                <input type="file" id="file-in" hidden onchange="sendFile(this)">
+                <input type="text" id="msg-input" placeholder="Написать сообщение..." onkeyup="checkEnter(event)">
+                <button class="send-btn" onclick="doSend()">➤</button>
+            </div>
+        </main>
+        <!-- Правая панель: Эмодзи -->
+        <aside class="right-panel">
+            <div class="right-header">
+                <div class="right-tabs">
+                    <button class="right-tab active" onclick="switchRightTab('emoji')">Эмодзи</button>
+                    <button id="app-info-btn" class="info-btn" title="Информация о приложении" onclick="showAppInfo()">ℹ️</button>
+                </div>
+                <!-- Поиск убран по запросу -->
+            </div>
+            <div class="sticker-grid" id="sticker-grid"></div>
+        </aside>
+    </div>
+
+    <!-- Модальное окно информации о приложении -->
+    <div id="app-info-modal" class="modal">
+        <div class="modal-content">
+            <h2>ℹ️ О Zapretgram</h2>
+            <p>Zapretgram — лёгкий мессенджер для демонстрации возможностей локального чата.</p>
+            <p>Функции:</p>
+            <ul>
+                <li>Список контактов и ботов</li>
+                <li>Архивирование чатов</li>
+                <li>Отправка сообщений и вложений (локально)</li>
+                <li>Синхронизация между вкладками через BroadcastChannel</li>
+            </ul>
+            <p>Данные хранятся в `localStorage` — всё локально на вашем компьютере.</p>
+            <div class="modal-actions">
+                <button onclick="closeAppInfo()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно меню приложения -->
+    <div id="app-menu-modal" class="modal">
+        <div class="modal-content app-menu-content">
+            <h2>⚙️ Меню Приложения</h2>
+            <div class="app-menu-items">
+                <div class="app-menu-item" onclick="handleMenuAction('settings')">
+                    <span class="menu-icon">⚙️</span>
+                    <div>
+                        <div class="menu-title">Настройки</div>
+                        <div class="menu-desc">Параметры приложения</div>
+                    </div>
+                </div>
+                <div class="app-menu-item" onclick="handleMenuAction('theme')">
+                    <span class="menu-icon">🎨</span>
+                    <div>
+                        <div class="menu-title">Оформление</div>
+                        <div class="menu-desc">Выбрать тему</div>
+                    </div>
+                </div>
+                <div class="app-menu-item" onclick="handleMenuAction('notifications')">
+                    <span class="menu-icon">🔔</span>
+                    <div>
+                        <div class="menu-title">Уведомления</div>
+                        <div class="menu-desc">Управление звуками</div>
+                    </div>
+                </div>
+                <div class="app-menu-item" onclick="handleMenuAction('privacy')">
+                    <span class="menu-icon">🔒</span>
+                    <div>
+                        <div class="menu-title">Приватность</div>
+                        <div class="menu-desc">Конфиденциальность</div>
+                    </div>
+                </div>
+                <div class="app-menu-item" onclick="handleMenuAction('about')">
+                    <span class="menu-icon">ℹ️</span>
+                    <div>
+                        <div class="menu-title">О приложении</div>
+                        <div class="menu-desc">Версия 1.0.0</div>
+                    </div>
+                </div>
+                <div class="app-menu-item" onclick="handleMenuAction('export')">
+                    <span class="menu-icon">📥</span>
+                    <div>
+                        <div class="menu-title">Экспортировать</div>
+                        <div class="menu-desc">Сохранить данные</div>
+                    </div>
+                </div>
+            </div>
+            <button onclick="closeModal('app-menu-modal')" class="app-menu-close">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Единый блок контекстного меню (сообщения и чаты) -->
+    <div id="context-menu" class="context-menu">
+        <div id="context-menu-msg" style="display:none;">
+            <div class="context-menu-item" onclick="contextAction('reply')"><span class="context-icon">💬</span><span>Ответить</span></div>
+            <div class="context-menu-item" onclick="contextAction('forward')"><span class="context-icon">🔁</span><span>Переслать</span></div>
+            <div class="context-menu-item" onclick="contextAction('pin')"><span class="context-icon">📌</span><span>Закрепить</span></div>
+            <div class="context-menu-item" onclick="contextAction('copy')"><span class="context-icon">📋</span><span>Копировать</span></div>
+            <div class="context-menu-item delete-item" onclick="contextAction('delete')"><span class="context-icon">🗑️</span><span>Удалить</span></div>
+        </div>
+        <div id="context-menu-chat" style="display:none;">
+            <div class="context-menu-item" onclick="handleContextMenu('archive')"><span class="context-icon">🗂️</span><span>Архивировать</span></div>
+            <div class="context-menu-item" onclick="handleContextMenu('unmute')"><span class="context-icon">🔓</span><span>Открепить</span></div>
+            <div class="context-menu-item" onclick="handleContextMenu('silent')"><span class="context-icon">🔇</span><span>Выключить уведомления</span></div>
+            <div class="context-menu-item" onclick="handleContextMenu('mark-read')"><span class="context-icon">✅</span><span>Пометить как непрочитанн</span></div>
+            <div class="context-menu-item" onclick="handleContextMenu('add-folder')"><span class="context-icon">📁</span><span>Добавить в папку</span></div>
+            <div class="context-menu-item" onclick="handleContextMenu('clear-history')"><span class="context-icon">🧹</span><span>Очистить историю</span></div>
+            <div class="context-menu-separator"></div>
+            <div class="context-menu-item delete-item" onclick="handleContextMenu('delete')"><span class="context-icon">🗑️</span><span>Удалить чат</span></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно профиля -->
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <h2>Профиль</h2>
+            <div class="profile-edit">
+                <img src="" alt="avatar" id="modal-avatar">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button onclick="openAvatarPicker()">Сменить аватар</button>
+                    <button onclick="document.getElementById('avatar-input-modal').click()" style="background:transparent; padding:8px; border:1px solid rgba(255,255,255,0.08);">Загрузить файл</button>
+                    <input type="file" id="avatar-input-modal" hidden onchange="updateAvatarFromModal(event)">
+                </div>
+            </div>
+            <div class="profile-fields">
+                <input type="text" id="profile-name-input" placeholder="Имя">
+                <input type="text" id="profile-nickname" placeholder="Псевдоним">
+                <input type="text" id="profile-birthplace" placeholder="Место рождения">
+                <input type="text" id="profile-birthyear" placeholder="Год рождения">
+                <textarea id="profile-bio" placeholder="О себе" rows="3"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button onclick="saveProfile()">Сохранить</button>
+                <button onclick="logout()" style="background: linear-gradient(45deg, #ff6b6b, #ee5a6f); color: white; flex: 1;">Выход</button>
+                <button onclick="closeModal('profile-modal')">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модал выбора аватарок -->
+    <div id="avatar-picker-modal" class="modal">
+        <div class="modal-content avatar-picker-content">
+            <h3>Выберите аватар</h3>
+            <div class="avatar-picker-grid" id="avatar-picker-grid">
+                <!-- Пустая сетка; аватары подгружаются динамически через script.js (presetAvatars) -->
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button onclick="closeModal('avatar-picker-modal')" style="flex:1;">Отмена</button>
+                <button onclick="closeModal('avatar-picker-modal')" style="flex:1; background: linear-gradient(45deg,#2AABEE,#1e9ed1); color:#fff;">Готово</button>
+                <button onclick="document.getElementById('avatar-input-modal').click()" style="flex:1;">Загрузить свой</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модал звонка -->
+    <div id="call-modal" class="modal call-modal">
+        <div class="modal-content call-modal-content">
+            <div class="call-avatar-wrap">
+                <img id="call-avatar" src="https://i.pravatar.cc/160?u=anon" alt="avatar" class="call-avatar">
+            </div>
+            <div class="call-info">
+                <div id="call-peer" class="call-peer">Zapret Bot</div>
+                <div id="call-type" class="call-type">Исходящий звонок</div>
+                <div id="call-status" class="call-status">Инициализация...</div>
+                <div id="call-timer" class="call-timer" style="display:none; margin-top:8px; font-weight:700; color: #fff;">00:00</div>
+            </div>
+
+            <div id="incoming-actions" style="display:none; gap:12px; margin-top:12px; justify-content:center;">
+                <button id="accept-btn" class="call-btn accept" onclick="acceptCall()">Принять</button>
+                <button class="call-btn decline" onclick="hangupCall()">Отклонить</button>
+            </div>
+
+            <div id="outgoing-actions" class="call-actions">
+                <button class="call-btn decline" onclick="hangupCall()">Отменить</button>
+            </div>
+
+            <div id="connected-controls" class="call-actions" style="display:none;">
+                <button id="mute-btn" class="call-btn" onclick="toggleMute()">🔇</button>
+                <button id="video-toggle-btn" class="call-btn" onclick="toggleCamera()">🎥</button>
+                <button class="call-btn" onclick="addParticipant()">➕</button>
+                <button class="call-btn decline" onclick="hangupCall()">Завершить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно настроек -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <h2>Настройки</h2>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <label style="display:flex; align-items:center; gap:10px;">
+                    <span style="width:110px;">Тема:</span>
+                    <select id="theme-select" onchange="changeTheme(this.value)">
+                        <option value="dark">Тёмная</option>
+                        <option value="light">Светлая</option>
+                    </select>
+                </label>
+
+                <label style="display:flex; align-items:center; gap:10px;">
+                    <span style="width:110px;">Уведомления:</span>
+                    <input type="checkbox" id="notif-toggle" onchange="toggleNotifications(this.checked)">
+                    <span id="notif-status">Включены</span>
+                </label>
+
+                <label style="display:flex; align-items:center; gap:10px;">
+                    <span style="width:110px;">Звук:</span>
+                    <select id="notif-sound-select">
+                        <option value="ping1">Ping 1</option>
+                        <option value="ping2">Ping 2</option>
+                        <option value="none">Без звука</option>
+                    </select>
+                </label>
+
+                <label style="display:flex; align-items:center; gap:10px;">
+                    <span style="width:110px;">Размер шрифта:</span>
+                    <input id="font-range" type="range" min="12" max="20" value="15">
+                    <span id="font-value">15px</span>
+                </label>
+
+                <label style="display:flex; align-items:center; gap:10px;">
+                    <span style="width:110px;">Показывать Online:</span>
+                    <input type="checkbox" id="show-online-toggle">
+                </label>
+
+                <label style="display:flex; align-items:center; gap:10px;">
+                    <span style="width:110px;">Подтверждение прочтения:</span>
+                    <input type="checkbox" id="read-receipts-toggle">
+                </label>
+
+                <div style="display:flex; gap:8px; margin-top:6px;">
+                    <button onclick="exportData()" style="background:linear-gradient(45deg,#2AABEE,#1e9ed1); color:#fff; padding:8px 12px; border:none; border-radius:8px;">Экспортировать данные</button>
+                    <button onclick="document.getElementById('import-data-file').click()" style="padding:8px 12px;">Импорт данных</button>
+                    <input type="file" id="import-data-file" style="display:none;" accept="application/json" onchange="importData(event)">
+                </div>
+
+                <div style="display:flex; gap:8px; margin-top:6px;">
+                    <button onclick="saveSettingsFromModal()" style="flex:1; background: linear-gradient(45deg, #ff1744, #ff5252); color: white; padding:10px; border:none; border-radius:8px;">Сохранить</button>
+                    <button onclick="closeModal('settings-modal')" style="flex:1;">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно управления ботами -->
+    <div id="bots-management-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>🤖 Управление ботами</h2>
+                <button onclick="closeModal('bots-management-modal')" style="background: none; border: none; font-size: 20px; cursor: pointer;">✕</button>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <h3 style="margin-top: 0; color: #2AABEE;">Активные боты:</h3>
+                <div id="bots-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px;">
+                    <!-- Динамически заполняется -->
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="bot-name-input" placeholder="Название нового бота" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                <button onclick="addNewBot()" style="padding: 8px 16px; background: linear-gradient(45deg, #2AABEE, #1e9ed1); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Добавить</button>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="removeDuplicates()" style="flex: 1; padding: 10px; background: linear-gradient(45deg, #ffa500, #ff8c00); color: white; border: none; border-radius: 6px; cursor: pointer;">🔄 Удалить дубликаты</button>
+                <button onclick="closeModal('bots-management-modal')" style="flex: 1; padding: 10px; background: #ccc; border: none; border-radius: 6px; cursor: pointer;">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Скрипты -->
+        <!-- Встроенный кэш пользователей: нужно для работы поиска при открытии index.html по file:// -->
+        <script>
+                window.__embedded_users = {
+    "Юсуф": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%AE%D1%81%D1%83%D1%84",
+        "nickname": "Юсуф",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.056Z"
+    },
+    "Али": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%90%D0%BB%D0%B8",
+        "nickname": "Али",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.057Z"
+    },
+    "Марат": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%9C%D0%B0%D1%80%D0%B0%D1%82",
+        "nickname": "Марат",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.057Z"
+    },
+    "Лиза": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%9B%D0%B8%D0%B7%D0%B0",
+        "nickname": "Лиза",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.057Z"
+    },
+    "Катя": {
+        "password": "123",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%9A%D0%B0%D1%82%D1%8F",
+        "nickname": "Катя",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "Demo user",
+        "registeredAt": "2026-06-11T16:41:04.057Z"
+    },
+    "Юсуф1": {
+        "password": "1234",
+        "avatar": "https://i.pravatar.cc/100?u=%D0%AE%D1%81%D1%83%D1%841",
+        "nickname": "Юсуф1",
+        "birthplace": "",
+        "birthyear": "",
+        "bio": "",
+        "registeredAt": "2026-06-11T16:42:20.404Z"
+    }
+};
+        </script>
+    <!-- Подключение основных скриптов в правильном порядке -->
+    <script src="data.js"></script>
+    <script src="auth.js"></script>
+    <script src="script.js"></script>
+    
+    <!-- Отключение зума -->
+    <script>
+        // Блокировка Ctrl + Wheel (зум колесиком)
+        document.addEventListener('wheel', (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Блокировка Ctrl +, Ctrl -, Ctrl 0
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0' || e.key === '=')) {
+                e.preventDefault();
+            }
+        });
+        
+        // Блокировка зума на мобильных (двойной тап)
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Сброс zoom в 100%
+        document.addEventListener('DOMContentLoaded', () => {
+            document.documentElement.style.zoom = '100%';
+        });
+        
+        // Следим за изменением zoom и возвращаем в норму
+        setInterval(() => {
+            if (document.documentElement.style.zoom !== '100%') {
+                document.documentElement.style.zoom = '100%';
+            }
+        }, 100);
+        
+        // Проверяем автоматический вход при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAutoLogin();
+        });
+    </script>
+</body>
+</html>

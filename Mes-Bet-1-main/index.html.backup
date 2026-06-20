@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zapretgram</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Экран входа (как в Telegram Desktop) -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <svg viewBox="0 0 24 24" width="50" height="50">
+                    <circle cx="12" cy="12" r="10" fill="#2AABEE" />
+                    <path d="M9 11 L12 14 L17 8" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" />
+                </svg>
+            </div>
+            <h1>Zapretgram</h1>
+            <p class="auth-subtitle">Добро пожаловать в Zapretgram — демо приложение.<br>Введите имя для входа или регистрации.</p>
+            <div class="auth-input-group">
+                <input type="text" id="username" placeholder="Имя (Саня, Маша...)" autocomplete="off">
+            </div>
+            <div class="auth-input-group">
+                <input type="password" id="password" placeholder="Пароль (1234)" autocomplete="off">
+            </div>
+            <button class="auth-next-btn" onclick="startApp()">Войти →</button>
+            <button class="auth-next-btn" style="margin-top:10px;background:linear-gradient(45deg,#3bbcff,#2a9fff);" onclick="showCallModal('Тестовый звонок')">Тестовый звонок</button>
+            <p class="auth-footer">🔥 Zapretka demo</p>
+            <div class="auth-hint">
+              <strong>Тестовые пользователи:</strong><br>
+              Саня, Маша, Тимур, Александр, Иван<br>
+              <strong>Пароль для всех: 1234</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основное приложение -->
+    <div id="main-app" class="main-app">
+        <!-- Боковая панель -->
+        <aside class="sidebar">
+            <button class="burger-btn" onclick="openBurgerMenu()" title="Меню">☰</button>
+            <!-- Профиль -->
+            <div class="profile-card" onclick="openProfileModal()">
+                <img src="https://i.pravatar.cc/40?u=me" alt="avatar" class="profile-avatar" id="my-avatar">
+                <div class="profile-info">
+                    <span class="profile-name" id="my-name">Loading...</span>
+                    <span class="profile-status">● Online</span>
+                </div>
+                <button class="profile-edit-btn" onclick="event.stopPropagation(); openProfileModal()">✎</button>
+            </div>
+
+            <!-- Поиск -->
+            <div class="search-box">
+                <input type="text" placeholder="Поиск" id="search-input">
+                <span class="search-icon">🔍</span>
+            </div>
+
+            <!-- Секции (архив, блог, избранное) -->
+            <div class="sidebar-sections">
+                <div class="section-item"><span>📥</span> Архив</div>
+                <div class="section-item"><span>📢</span> VPNTYPE Blog</div>
+                <div class="section-item"><span>⭐</span> Избранное</div>
+            </div>
+
+            <!-- Список чатов -->
+            <div class="chats-list" id="contacts-list">
+                <!-- Динамически из JS -->
+            </div>
+            
+            <!-- Архив -->
+            <div class="archived-section">
+                <h3 class="archived-title">Архив</h3>
+                <div id="archived-list" class="archived-list"></div>
+            </div>
+        </aside>
+
+        <!-- Основная область чата -->
+        <main class="chat-main">
+            <!-- Шапка чата -->
+            <div class="chat-header">
+                <div class="chat-header-left">
+                    <img src="" alt="" class="chat-avatar" id="current-chat-avatar">
+                    <div>
+                        <h2 id="current-chat-title">Zapret Bot</h2>
+                        <div class="chat-subtitle" id="current-chat-subtitle"></div>
+                        <small class="chat-status">online</small>
+                    </div>
+                </div>
+                <div class="chat-header-actions">
+                    <button onclick="searchInChat()">🔍</button>
+                    <button onclick="startCall()">📞</button>
+                    <button onclick="startVideoCall()">📹</button>
+                    <button id="archive-btn" onclick="toggleArchiveCurrentChat()" title="Архивировать/Восстановить чат">🗄️</button>
+                </div>
+            </div>
+
+            <!-- Сообщения -->
+            <div class="messages-area" id="chat-box"></div>
+
+            <!-- Кнопка быстрого перехода вниз (появляется при прокрутке вверх) -->
+            <button id="scroll-down-btn" class="scroll-down" onclick="scrollToBottom()" title="Перейти к последним сообщениям">↓</button>
+
+            <!-- Панель эмодзи -->
+            <div class="emoji-panel" id="emoji-shelf"></div>
+
+            <!-- Ввод сообщения -->
+            <div class="message-input-area">
+                <button class="attach-btn" onclick="document.getElementById('file-in').click()">📎</button>
+                <button id="voice-btn" class="voice-btn" onclick="toggleRecording()" title="Нажмите, чтобы записать голосовое">🎙️</button>
+                <input type="file" id="file-in" hidden onchange="sendFile(this)">
+                <input type="text" id="msg-input" placeholder="Написать сообщение..." onkeyup="checkEnter(event)">
+                <button class="send-btn" onclick="doSend()">➤</button>
+            </div>
+        </main>
+        <!-- Правая панель: Эмодзи / Стикеры / GIF -->
+        <aside class="right-panel">
+            <div class="right-header">
+                <div class="right-tabs">
+                    <button class="right-tab active">Эмодзи</button>
+                    <button class="right-tab">Стикеры</button>
+                    <button class="right-tab">GIF</button>
+                </div>
+                <input class="right-search" placeholder="Поиск">
+            </div>
+            <div class="sticker-grid" id="sticker-grid">
+                <!-- Простейшая сетка стикеров (эмодзи как плейсхолдеры) -->
+                <div class="sticker-item">😀</div>
+                <div class="sticker-item">😂</div>
+                <div class="sticker-item">😍</div>
+                <div class="sticker-item">😭</div>
+                <div class="sticker-item">😎</div>
+                <div class="sticker-item">🤡</div>
+                <div class="sticker-item">👍</div>
+                <div class="sticker-item">👏</div>
+                <div class="sticker-item">🔥</div>
+                <div class="sticker-item">💀</div>
+                <div class="sticker-item">🐶</div>
+                <div class="sticker-item">🐱</div>
+                <div class="sticker-item">🍕</div>
+                <div class="sticker-item">🚀</div>
+                <div class="sticker-item">🎉</div>
+                <div class="sticker-item">🌈</div>
+                <div class="sticker-item">🎵</div>
+                <div class="sticker-item">📷</div>
+                <div class="sticker-item">📌</div>
+                <div class="sticker-item">💬</div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Модальное окно профиля -->
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <h2>Профиль</h2>
+            <div class="profile-edit">
+                <img src="" alt="avatar" id="modal-avatar">
+                <button onclick="document.getElementById('avatar-input-modal').click()">Сменить аватар</button>
+                <input type="file" id="avatar-input-modal" hidden onchange="updateAvatarFromModal(event)">
+            </div>
+            <div class="profile-fields">
+                <input type="text" id="profile-name-input" placeholder="Имя">
+                <input type="text" id="profile-nickname" placeholder="Псевдоним">
+                <input type="text" id="profile-birthplace" placeholder="Место рождения">
+                <input type="text" id="profile-birthyear" placeholder="Год рождения">
+                <textarea id="profile-bio" placeholder="О себе" rows="3"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button onclick="saveProfile()">Сохранить</button>
+                <button onclick="logout()" style="background: linear-gradient(45deg, #ff6b6b, #ee5a6f); color: white; flex: 1;">Выход</button>
+                <button onclick="closeModal('profile-modal')">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модал звонка -->
+    <div id="call-modal" class="modal">
+        <div class="modal-content call-modal-content">
+            <h3 id="call-title">Звонок</h3>
+            <div id="call-status">Инициализация...</div>
+            <div class="call-actions">
+                <button onclick="acceptCall()">Принять</button>
+                <button onclick="hangupCall()">Завершить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Скрипты -->
+    <script src="data.js"></script>
+    <script src="auth.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
