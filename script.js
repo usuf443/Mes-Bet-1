@@ -17,6 +17,27 @@ let currentContextMsgId = null;
 // id сообщения, на которое сейчас отвечает пользователь (null если не в режиме ответа)
 let replyToMessageId = null;
 
+// Проектные аватарки: файлы в assets/avatars — используются вместо генератора pravatar
+const projectAvatars = [
+    'assets/avatars/avatar1.jpg',
+    'assets/avatars/avatar2.jpg',
+    'assets/avatars/avatar3.jpg',
+    'assets/avatars/avatar4.jpg',
+    'assets/avatars/avatar5.jpg',
+    'assets/avatars/avatar6.jpg',
+    'assets/avatars/avatar7.jpg',
+    'assets/avatars/avatar8.jpg',
+    'assets/avatars/default-avatar.svg'
+];
+
+function pickProjectAvatar(name) {
+    if (!projectAvatars || projectAvatars.length === 0) return null;
+    if (!name) return projectAvatars[0];
+    let sum = 0;
+    for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+    return projectAvatars[sum % projectAvatars.length];
+}
+
 // Управление состоянием ввода сообщения (включить/отключить в зависимости от выбранного чата)
 function setMessageInputEnabled(enabled) {
     const input = document.getElementById('msg-input');
@@ -68,6 +89,21 @@ function updateChatAreaVisibility(hasActive) {
     }
     // Управление состоянием элементов ввода (включить/выключить)
     try { setMessageInputEnabled(!!hasActive); } catch (e) {}
+}
+
+function isMobileDevice() {
+    if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
+    const userAgent = navigator.userAgent || '';
+    const touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+    const smallScreen = window.matchMedia('(max-width: 768px)').matches;
+    const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    return mobileUa || (touch && smallScreen);
+}
+
+function applyDeviceClasses() {
+    const mobile = isMobileDevice();
+    document.body.classList.toggle('mobile-device', mobile);
+    document.body.classList.toggle('desktop-device', !mobile);
 }
 
 // Микрофон - один раз запрашиваем и переиспользуем
@@ -389,6 +425,15 @@ function getAvatarUrl(name, size = 48) {
         }
     }
     // Если есть users (серверные/встроенные) и у пользователя есть avatar — используем
+    // Если есть проектные аватарки — используем их для контактов (кроме меня и ботов)
+    try {
+        const botsTemp = getActiveBots();
+        if (projectAvatars && projectAvatars.length > 0 && !(me && me.name === name) && !botsTemp.includes(name)) {
+            const pa = pickProjectAvatar(name);
+            if (pa) return pa;
+        }
+    } catch (e) {}
+
     const uFromList = (users || []).find(x => x.name === name && x.avatar);
     if (uFromList && uFromList.avatar) {
         const a = uFromList.avatar;
@@ -412,7 +457,7 @@ function getAvatarUrl(name, size = 48) {
     // 3. Боты
     const bots = getActiveBots();
     if (bots.includes(name)) {
-        return `https://i.pravatar.cc/${size}?u=bot`;
+        return 'assets/bot-avatar.jpg';
     }
     // 4. users (стартовые)
     const u = (users || []).find(x => x.name === name);
@@ -425,7 +470,13 @@ function getAvatarUrl(name, size = 48) {
         } catch (e) {}
         return u.avatar;
     }
-    // 5. fallback
+    // 5. Используем проектные аватарки если они есть
+    if (typeof pickProjectAvatar === 'function') {
+        const pa = pickProjectAvatar(name);
+        if (pa) return pa;
+    }
+
+    // 6. fallback — генератор
     return `https://i.pravatar.cc/${size}?u=${encodeURIComponent(name)}`;
 }
 
@@ -561,6 +612,10 @@ function initApp() {
     
     // Инициализируем поиск
     setupSearch();
+
+    // Определяем устройство и применяем специальные классы
+    applyDeviceClasses();
+    window.addEventListener('resize', () => applyDeviceClasses());
     
     // Инициализируем видимость архива
     const archivedSection = document.querySelector('.archived-section');
@@ -568,10 +623,19 @@ function initApp() {
         const isVisible = JSON.parse(localStorage.getItem('zapretka_archive_visible') || 'false');
         archivedSection.style.display = isVisible ? 'block' : 'none';
     }
-    // Загрузим архив для текущего пользователя
+    // Загрузим архив для текущего пользователя (поддерживаем миграцию старого ключа)
     try {
-        const key = 'zapretka_archived_' + (me && me.name ? me.name : 'global');
-        archivedChats = JSON.parse(localStorage.getItem(key) || '[]');
+        const perUserKey = 'zapretka_archived_' + (me && me.name ? me.name : 'global');
+        let stored = localStorage.getItem(perUserKey);
+        if (!stored) {
+            // legacy global key support: если есть старый ключ 'zapretka_archived', перенесём в per-user
+            const legacy = localStorage.getItem('zapretka_archived');
+            if (legacy) {
+                try { localStorage.setItem(perUserKey, legacy); localStorage.removeItem('zapretka_archived'); } catch (e) {}
+                stored = legacy;
+            }
+        }
+        archivedChats = JSON.parse(stored || '[]');
     } catch (e) { archivedChats = []; }
     
     // Инициализируем правую панель (эмодзи/стикеры/гифы)
@@ -623,6 +687,12 @@ function renderArchivedList() {
         row.style.padding = '8px';
         row.style.borderBottom = '1px solid #eee';
         row.style.alignItems = 'center';
+        row.style.cursor = 'pointer';
+        row.style.borderRadius = '8px';
+        row.style.transition = 'background 0.2s';
+        row.style.backgroundColor = activeArchiveChat === name ? 'rgba(255, 23, 68, 0.2)' : 'transparent';
+        row.onmouseenter = () => { row.style.background = 'rgba(255,255,255,0.05)'; };
+        row.onmouseleave = () => { row.style.background = activeArchiveChat === name ? 'rgba(255, 23, 68, 0.2)' : 'transparent'; };
         
         const avatarUrl = getAvatarUrl(name, 32);
         
@@ -663,13 +733,82 @@ function renderArchivedList() {
         unarchiveBtn.style.fontSize = '16px';
         unarchiveBtn.onclick = (e) => { e.stopPropagation(); unarchiveChat(name); };
 
-        row.onclick = function () { setActiveChat(name, this); };
+        // Клик для открытия истории архивированного чата
+        row.onclick = function () { 
+            activeArchiveChat = name;
+            renderArchivedList();
+            displayArchivedChatMessages(name);
+        };
         row.appendChild(left);
         row.appendChild(info);
         row.appendChild(unarchiveBtn);
         
         container.appendChild(row);
     });
+}
+
+// Показываем сообщения архивированного чата в основной области
+function displayArchivedChatMessages(chatName) {
+    if (!chatName) return;
+
+    // Устанавливаем активный чат на имя архивного контакта
+    activeContact = chatName;
+    setMessageInputEnabled(true);
+    updateChatAreaVisibility(true);
+
+    const archiveView = document.getElementById('archive-view');
+    if (archiveView) archiveView.style.display = 'none';
+
+    const placeholder = document.getElementById('no-chat-placeholder');
+    if (placeholder) placeholder.style.display = 'none';
+
+    const currentAvatarEl = document.getElementById('current-chat-avatar');
+    if (currentAvatarEl) {
+        currentAvatarEl.src = getAvatarUrl(chatName, 48);
+        attachAvatarFallback(currentAvatarEl, chatName, 48);
+    }
+
+    const titleEl = document.getElementById('current-chat-title');
+    if (titleEl) titleEl.innerText = chatName;
+
+    const activeBots = getActiveBots();
+    const subtitleEl = document.getElementById('current-chat-subtitle');
+    if (subtitleEl) {
+        if (activeBots.includes(chatName)) {
+            subtitleEl.innerText = '🤖 Бот | Статус: онлайн';
+        } else {
+            const userEntry = (users || []).find(u => u.name === chatName);
+            const isOnline = !!(userEntry && userEntry.online);
+            subtitleEl.innerText = isOnline ? 'Онлайн' : 'Офлайн';
+        }
+    }
+
+    // Рендерим историю через стандартную функцию
+    renderMessages();
+}
+
+// Плейсхолдер для архива (когда ничего не выбрано)
+function showArchivePlaceholder() {
+    const messagesBox = document.getElementById('chat-box');
+    const header = document.querySelector('.chat-header');
+    const inputArea = document.querySelector('.message-input-area');
+    const emojiPanel = document.getElementById('emoji-shelf');
+    const placeholder = document.getElementById('no-chat-placeholder');
+    
+    if (messagesBox) messagesBox.style.display = 'none';
+    if (header) header.style.display = 'none';
+    if (inputArea) inputArea.style.display = 'none';
+    if (emojiPanel) emojiPanel.style.display = 'none';
+    
+    if (placeholder) {
+        placeholder.innerText = 'Выберите чат для общения';
+        placeholder.style.display = 'flex';
+    }
+}
+
+// Рендерим архив в основной области (archive-view) - уже не используется
+function renderArchiveViewList() {
+    // Теперь архив работает как Telegram - левая панель со списком, правая часть с историей
 }
 
 // Обновим бейдж с количеством в архиве
@@ -691,41 +830,47 @@ renderContacts = function() {
 
 // Archive folder navigation state
 let inArchiveFolder = false;
+let activeArchiveChat = null;  // Текущий открытый архивированный чат
 
 function enterArchiveFolder() {
     inArchiveFolder = true;
-    // Покажем архив как главное содержимое чатов
-    document.querySelector('.sidebar').classList.add('in-archive');
+    activeArchiveChat = null;  // Сбросим выбор при входе в архив
+    
     // Показать стрелку в боковом меню рядом с эмодзи
     const sbBack = document.getElementById('archive-back-sidebar');
     if (sbBack) sbBack.style.display = 'inline-block';
-    // Добавим заголовок в основную область чата с кнопкой назад
-    const chatMain = document.querySelector('.chat-main');
-    if (chatMain) {
-        const existing = document.getElementById('archive-view-header');
-        if (!existing) {
-            const hdr = document.createElement('div');
-            hdr.id = 'archive-view-header';
-            hdr.className = 'archive-header';
-            hdr.innerHTML = `<button class="archive-back-btn" onclick="exitArchiveFolder()">←</button><h3 style="margin:0;">Архив</h3>`;
-            chatMain.insertBefore(hdr, chatMain.firstChild);
-        }
-    }
-    // Скрыть список чатов и показать архивное содержимое
+    
+    // Скрыть список чатов и показать архивное содержимое в боковой панели
     document.querySelector('.chats-list').style.display = 'none';
-    document.querySelector('.archived-section').style.display = 'block';
+    const archivedSection = document.querySelector('.archived-section');
+    if (archivedSection) archivedSection.style.display = 'block';
+    
+    // Показать плейсхолдер в основной области
+    showArchivePlaceholder();
+    
+    // Обновим список архивных чатов в боковой панели
+    renderArchivedList();
 }
 
 function exitArchiveFolder() {
     inArchiveFolder = false;
-    document.querySelector('.sidebar').classList.remove('in-archive');
+    activeArchiveChat = null;
+    
     const sbBack = document.getElementById('archive-back-sidebar');
     if (sbBack) sbBack.style.display = 'none';
-    const hdr = document.getElementById('archive-view-header');
-    if (hdr) hdr.remove();
+    
+    // Показываем основной список чатов в боковой панели
     document.querySelector('.chats-list').style.display = '';
     const archivedSection = document.querySelector('.archived-section');
     if (archivedSection) archivedSection.style.display = 'none';
+    
+    // Возвращаемся к основному режиму
+    updateChatAreaVisibility(!!activeContact);
+    
+    // Если был активный чат - показываем его
+    if (activeContact) {
+        renderMessages();
+    }
 }
 
 // При архивации перемещаем чат в папку Архив
@@ -738,12 +883,55 @@ function archiveChat(name) {
     if (activeContact === name) {
         activeContact = activeBots[0] || 'Zapret Bot';
         document.getElementById('current-chat-title').innerText = activeContact;
-        document.getElementById('current-chat-avatar').src = 'https://i.pravatar.cc/48?u=bot';
+        document.getElementById('current-chat-avatar').src = 'assets/bot-avatar.jpg';
         renderMessages();
     }
     renderContacts();
     // Если мы в папке Архив — обновим список
     if (inArchiveFolder) renderArchivedList();
+}
+
+function toggleArchiveCurrentChat() {
+    if (!activeContact) return;
+    if (isArchived(activeContact)) {
+        unarchiveChat(activeContact);
+        alert(`✅ Чат "${activeContact}" восстановлен из архива`);
+    } else {
+        archiveChat(activeContact);
+        alert(`✅ Чат "${activeContact}" архивирован`);
+    }
+}
+
+// Открыть модальное окно информации о приложении
+function showAppInfo() {
+    const modal = document.getElementById('app-info-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+// Закрыть модальное окно информации
+function closeAppInfo() {
+    const modal = document.getElementById('app-info-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+// При разархивации перемещаем чат из папки Архив обратно в основной список
+function unarchiveChat(name) {
+    if (!name || !isArchived(name)) return;
+    
+    // Удаляем из архива
+    const index = archivedChats.indexOf(name);
+    if (index > -1) {
+        archivedChats.splice(index, 1);
+        saveArchived();
+    }
+    
+    // Обновляем отображение
+    renderContacts();
+    // Если мы в папке Архив — обновим список
+    if (inArchiveFolder) {
+        renderArchivedList();
+        renderArchiveViewList();
+    }
 }
 
 function isArchived(contactName) {
@@ -1203,16 +1391,16 @@ function updateAvatarFromModal(event) {
     }
 }
 
-// ПРЕДУСТАНОВЛЕННЫЕ АВАТАРЫ (проверяются локальные JPG, при их отсутствии попробует SVG)
+// ПРЕДУСТАНОВЛЕННЫЕ АВАТАРЫ (локальные SVG/PNG/JPG в assets/avatars)
 const presetAvatars = [
-    'assets/avatars/avatar1.jpg',
-    'assets/avatars/avatar2.jpg',
-    'assets/avatars/avatar3.jpg',
-    'assets/avatars/avatar4.jpg',
-    'assets/avatars/avatar5.jpg',
-    'assets/avatars/avatar6.jpg',
-    'assets/avatars/avatar7.jpg',
-    'assets/avatars/avatar8.jpg'
+    'assets/avatars/avatar1.svg',
+    'assets/avatars/avatar2.svg',
+    'assets/avatars/avatar3.svg',
+    'assets/avatars/avatar4.svg',
+    'assets/avatars/avatar5.svg',
+    'assets/avatars/avatar6.svg',
+    'assets/avatars/avatar7.svg',
+    'assets/avatars/avatar8.svg'
 ];
 
 // Универсальная функция для установки fallback аватара при ошибке загрузки
@@ -1221,18 +1409,31 @@ function attachAvatarFallback(imgEl, name, size) {
     imgEl.onerror = function() {
         try {
             this.onerror = null;
-            // Попробуем локальные аватарки в assets/avatars
-            const base = 'assets/avatars/' + encodeURIComponent(name).replace(/%20/g, '_').toLowerCase();
-            // сначала JPG/PNG
-            const candidate = base + '.jpg';
-            fetch(candidate, { method: 'HEAD' }).then(resp => {
-                if (resp.ok) {
-                    imgEl.src = candidate;
-                } else {
-                    // используем дефолтный SVG
+            // Попробуем локальные аватарки в assets/avatars (несколько форматов)
+            const encodedName = encodeURIComponent(name).replace(/%20/g, '_').toLowerCase();
+            const candidates = [
+                `assets/avatars/${encodedName}.svg`,
+                `assets/avatars/${encodedName}.png`,
+                `assets/avatars/${encodedName}.jpg`,
+            ];
+            // Проверим по очереди HEAD-запросом
+            let found = false;
+            const tryNext = (i) => {
+                if (i >= candidates.length) {
                     imgEl.src = 'assets/avatars/default-avatar.svg';
+                    return;
                 }
-            }).catch(() => { imgEl.src = 'assets/avatars/default-avatar.svg'; });
+                const candidate = candidates[i];
+                fetch(candidate, { method: 'HEAD' }).then(resp => {
+                    if (resp.ok) {
+                        imgEl.src = candidate;
+                        found = true;
+                    } else {
+                        tryNext(i + 1);
+                    }
+                }).catch(() => { tryNext(i + 1); });
+            };
+            tryNext(0);
         } catch (e) { this.src = 'assets/avatars/default-avatar.svg'; }
     };
 }
@@ -1543,48 +1744,6 @@ function initCursorLight() {
     });
 }
 
-function archiveChat(name) {
-    const activeBots = getActiveBots();
-    if (!name || isArchived(name) || activeBots.includes(name)) return; // Боты не архивируются
-    archivedChats.unshift(name);
-    saveArchived();
-    // Если архивируем текущий активный чат, переключаемся на первого бота
-    if (activeContact === name) {
-        activeContact = activeBots[0] || 'Zapret Bot';
-        document.getElementById('current-chat-title').innerText = activeContact;
-        document.getElementById('current-chat-avatar').src = 'https://i.pravatar.cc/48?u=bot';
-        renderMessages();
-    }
-    renderContacts();
-}
-
-function unarchiveChat(name) {
-    const idx = archivedChats.indexOf(name);
-    if (idx === -1) return;
-    archivedChats.splice(idx, 1);
-    saveArchived();
-    renderContacts();
-}
-
-function unarchiveAll() {
-    if (!confirm('Разархивировать все чаты?')) return;
-    archivedChats.slice().forEach(n => unarchiveChat(n));
-    renderContacts();
-    if (inArchiveFolder) renderArchivedList();
-}
-
-function toggleArchiveCurrentChat() {
-    const activeBots = getActiveBots();
-    if (!activeContact || activeBots.includes(activeContact)) {
-        alert('🤖 Боты не могут быть архивированы!');
-        return;
-    }
-    if (isArchived(activeContact)) {
-        unarchiveChat(activeContact);
-    } else {
-        archiveChat(activeContact);
-    }
-}
 
 /* ---------- Кнопка быстрого скролла вниз и логика показа ---------- */
 function scrollToBottom() {
@@ -2251,7 +2410,7 @@ function setupSearch() {
         
         // 1. Поиск по локальным контактам
         const allContacts = [
-            { name: 'Zapret Bot', avatar: 'https://i.pravatar.cc/48?u=bot', type: 'bot' },
+            { name: 'Zapret Bot', avatar: 'assets/bot-avatar.jpg', type: 'bot' },
             ...(users || [])
         ];
         
@@ -2570,10 +2729,11 @@ function closeSidebar() {
 document.addEventListener('click', (e) => {
     const sidebar = document.querySelector('.sidebar');
     const burgerBtn = document.querySelector('.burger-btn');
-    if (!sidebar || !burgerBtn) return;
-    
-    // Если это не боковая панель и не кнопка меню
-    if (!sidebar.contains(e.target) && !burgerBtn.contains(e.target)) {
+    const mobileMenuBtn = document.querySelector('.mobile-only');
+    if (!sidebar) return;
+
+    // Если это не боковая панель и не кнопка меню / мобильная кнопка открытия
+    if (!sidebar.contains(e.target) && !(burgerBtn && burgerBtn.contains(e.target)) && !(mobileMenuBtn && mobileMenuBtn.contains(e.target))) {
         closeSidebar();
     }
 });

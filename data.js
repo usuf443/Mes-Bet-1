@@ -112,8 +112,25 @@ function initializeDemoUsers() {
     }
 }
 
-// Вызываем инициализацию при загрузке
-initializeDemoUsers();
+// Удалить все зарегистрированные аккаунты из localStorage
+function clearRegisteredAccounts() {
+    try {
+        localStorage.removeItem('zapretka_registered_users');
+        console.log('✅ Все зарегистрированные аккаунты удалены');
+    } catch (e) {
+        console.error('Не удалось очистить аккаунты', e);
+    }
+}
+
+// Одноразовая очистка зарегистрированных аккаунтов при следующем запуске приложения.
+// После удаления помечаем, чтобы не стирать новые аккаунты при следующих перезагрузках.
+if (typeof window !== 'undefined' && !localStorage.getItem('zapretka_accounts_cleared_once')) {
+    clearRegisteredAccounts();
+    localStorage.setItem('zapretka_accounts_cleared_once', '1');
+}
+
+// Если нужно запускать очистку вручную, вызовите clearRegisteredAccounts() из консоли.
+// Инициализация демо-пользователей отключена, чтобы хранилище оставалось чистым.
 
 // Динамический массив контактов (загружаются при инициализации приложения)
 let users = [];
@@ -130,7 +147,7 @@ function saveBots(botList) {
     localStorage.setItem('zapretka_bots', JSON.stringify(botList));
 }
 
-function addBot(botName, botAvatar = 'https://i.pravatar.cc/48?u=bot', botPreview = 'Привет! Я новый бот.') {
+function addBot(botName, botAvatar = 'assets/bot-avatar.jpg', botPreview = 'Привет! Я новый бот.') {
     const bots = getActiveBots();
     if (!bots.includes(botName)) {
         bots.push(botName);
@@ -170,7 +187,7 @@ function getChats() {
         name: botName,
         type: 'channel',
         pinned: botName === 'Zapret Bot', // Основной бот всегда пиннут
-        avatar: 'https://i.pravatar.cc/48?u=bot',
+        avatar: 'assets/bot-avatar.jpg',
         preview: botName === 'Zapret Bot' 
             ? 'Привет! Я Zapret Bot — напиши что-нибудь.' 
             : `Это ${botName}`

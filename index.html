@@ -63,7 +63,7 @@
         <!-- Боковая панель -->
         <aside class="sidebar">
             <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
-                <button class="burger-btn" onclick="openAppMenu()" title="Меню" style="color: #ff5252; background: transparent; font-size: 20px;">☰</button>
+                <button class="burger-btn" onclick="toggleSidebar()" title="Открыть список чатов" style="color: #ff5252; background: transparent; font-size: 20px;">☰</button>
                 <button id="theme-toggle" class="theme-toggle" title="Переключить тему" onclick="toggleTheme()">🌙</button>
             </div>
             <!-- Профиль -->
@@ -96,12 +96,12 @@
             <div class="chats-list" id="contacts-list">
                 <!-- Динамически из JS -->
             </div>
-            
-            <!-- Архив -->
+
+            <!-- Секция архива для боковой панели -->
             <div class="archived-section" style="display:none;">
-                <h3 class="archived-title">Архив</h3>
+                <div class="archived-title">Архив</div>
                 <div id="archived-list" class="archived-list"></div>
-                <div style="padding:8px; text-align:center; color:#999;" id="archived-empty">Архив пуст</div>
+                <div id="archived-empty" style="padding: 12px 8px; color: var(--text-secondary);">Архив пуст</div>
             </div>
         </aside>
 
@@ -118,6 +118,7 @@
                     </div>
                 </div>
                 <div class="chat-header-actions">
+                    <button class="mobile-only" onclick="toggleSidebar()" title="Открыть меню чатов">☰</button>
                     <button onclick="searchInChat()">🔍</button>
                     <button onclick="startCall()">📞</button>
                     <button onclick="startVideoCall()">📹</button>
@@ -127,6 +128,15 @@
 
             <!-- Сообщения -->
             <div class="messages-area" id="chat-box"></div>
+
+            <!-- Архив (отображается вместо сообщений) -->
+            <div id="archive-view" class="archive-view" style="display: none; padding: 20px; overflow-y: auto; flex: 1;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                    <button onclick="exitArchiveFolder()" style="background: none; border: none; font-size: 24px; cursor: pointer;">←</button>
+                    <h2 style="margin: 0;">📦 Архив</h2>
+                </div>
+                <div id="archive-view-list"></div>
+            </div>
 
             <!-- Контекстное меню для сообщений и чатов (удалено — используется единый блок внизу) -->
 
@@ -150,11 +160,31 @@
             <div class="right-header">
                 <div class="right-tabs">
                     <button class="right-tab active" onclick="switchRightTab('emoji')">Эмодзи</button>
+                    <button id="app-info-btn" class="info-btn" title="Информация о приложении" onclick="showAppInfo()">ℹ️</button>
                 </div>
                 <!-- Поиск убран по запросу -->
             </div>
             <div class="sticker-grid" id="sticker-grid"></div>
         </aside>
+    </div>
+
+    <!-- Модальное окно информации о приложении -->
+    <div id="app-info-modal" class="modal">
+        <div class="modal-content">
+            <h2>ℹ️ О Zapretgram</h2>
+            <p>Zapretgram — лёгкий мессенджер для демонстрации возможностей локального чата.</p>
+            <p>Функции:</p>
+            <ul>
+                <li>Список контактов и ботов</li>
+                <li>Архивирование чатов</li>
+                <li>Отправка сообщений и вложений (локально)</li>
+                <li>Синхронизация между вкладками через BroadcastChannel</li>
+            </ul>
+            <p>Данные хранятся в `localStorage` — всё локально на вашем компьютере.</p>
+            <div class="modal-actions">
+                <button onclick="closeAppInfo()">Закрыть</button>
+            </div>
+        </div>
     </div>
 
     <!-- Модальное окно меню приложения -->
